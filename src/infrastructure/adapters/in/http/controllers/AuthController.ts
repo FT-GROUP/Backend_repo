@@ -8,14 +8,44 @@ import {
   actualizarPerfilUseCase,
   desactivarCuentaUseCase,
   activarCuentaUseCase,
+  auditoriaService,
 } from '../../../../config/container';
 import { RequestAutenticado } from '../middlewares/authMiddleware';
+import { RolUsuario } from '../../../../../domain/entities/Usuario';
+import { CredencialesInvalidasError, UsuarioInactivoError } from '../../../../../domain/errors/DomainErrors';
 import {
   RegistrarUsuarioInput,
   IniciarSesionInput,
   RefrescarTokenInput,
   ActualizarPerfilInput,
 } from '../validators/authValidators';
+
+function registrarEventoAcceso(
+  usuario: { id: number; email: string; rol: RolUsuario },
+  accion: string,
+  ruta: string,
+  solicitudId?: string,
+): Promise<void> {
+  return auditoriaService.registrar({
+    actorId: usuario.id,
+    actorEmail: usuario.email,
+    actorRol: usuario.rol,
+    accion,
+    motivo: accion === 'REGISTRO'
+      ? 'Crear una cuenta para habilitar el acceso al sistema.'
+      : 'Verificar la identidad y crear una sesión.',
+    metodo: 'POST',
+    ruta,
+    estadoHttp: accion === 'REGISTRO' ? 201 : 200,
+    solicitudId: solicitudId ?? null,
+  }).catch(() => {
+    console.error(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      level: 'error',
+      type: 'authentication_audit_write_failed',
+    }));
+  });
+}
 
 /**
  * Adaptador de entrada (controlador HTTP / API REST).
@@ -32,6 +62,7 @@ export class AuthController {
   ) {
     try {
       const resultado = await registrarUsuarioUseCase.ejecutar(req.body);
+      await registrarEventoAcceso(resultado, 'REGISTRO', '/api/auth/registro', res.locals.requestId);
       res.status(201).json({
         mensaje: 'Usuario registrado exitosamente.',
         usuario: resultado,
@@ -48,8 +79,28 @@ export class AuthController {
   ) {
     try {
       const resultado = await iniciarSesionUseCase.ejecutar(req.body);
+      await registrarEventoAcceso(resultado.usuario, 'INICIO_SESION', '/api/auth/login', res.locals.requestId);
       res.status(200).json(resultado);
     } catch (error) {
+      if (error instanceof CredencialesInvalidasError || error instanceof UsuarioInactivoError) {
+        await auditoriaService.registrar({
+          actorId: null,
+          actorEmail: req.body.email,
+          actorRol: 'usuario',
+          accion: 'INICIO_SESION_FALLIDO',
+          motivo: 'Rechazar credenciales o cuenta no habilitada y detectar accesos no autorizados.',
+          metodo: 'POST',
+          ruta: '/api/auth/login',
+          estadoHttp: error instanceof UsuarioInactivoError ? 403 : 401,
+          solicitudId: res.locals.requestId ?? null,
+        }).catch(() => {
+          console.error(JSON.stringify({
+            timestamp: new Date().toISOString(),
+            level: 'error',
+            type: 'authentication_audit_write_failed',
+          }));
+        });
+      }
       next(error);
     }
   }

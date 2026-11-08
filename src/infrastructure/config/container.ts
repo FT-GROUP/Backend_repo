@@ -1,103 +1,110 @@
-import { pool } from '../adapters/out/persistence/postgres/db';
+import { pool, poolHistorico } from '../adapters/out/persistence/postgres/db';
 import { PostgresUsuarioRepository } from '../adapters/out/persistence/postgres/PostgresUsuarioRepository';
 import { PostgresRefreshTokenRepository } from '../adapters/out/persistence/postgres/PostgresRefreshTokenRepository';
-import { PostgresGrupoRepository } from '../adapters/out/persistence/postgres/PostgresGrupoRepository';
-import { PostgresGastoRepository } from '../adapters/out/persistence/postgres/PostgresGastoRepository';
-import { PostgresBalanceRepository } from '../adapters/out/persistence/postgres/PostgresBalanceRepository';
-import { PostgresMovimientoRepository } from '../adapters/out/persistence/postgres/PostgresMovimientoRepository';
-import { BcryptPasswordHasher } from '../adapters/out/security/BcryptPasswordHasher';
+import { Argon2PasswordHasher } from '../adapters/out/security/Argon2PasswordHasher';
 import { JwtTokenService } from '../adapters/out/security/JwtTokenService';
 import { RegistrarUsuarioUseCaseImpl } from '../../application/usecases/RegistrarUsuarioUseCaseImpl';
 import { IniciarSesionUseCaseImpl } from '../../application/usecases/IniciarSesionUseCaseImpl';
 import { RefrescarTokenUseCaseImpl } from '../../application/usecases/RefrescarTokenUseCaseImpl';
 import { CerrarSesionUseCaseImpl } from '../../application/usecases/CerrarSesionUseCaseImpl';
 import { ObtenerPerfilUseCaseImpl } from '../../application/usecases/ObtenerPerfilUseCaseImpl';
+import { env } from './env';
 import { ActualizarPerfilUseCaseImpl } from '../../application/usecases/ActualizarPerfilUseCaseImpl';
 import { DesactivarCuentaUseCaseImpl } from '../../application/usecases/DesactivarCuentaUseCaseImpl';
 import { ActivarCuentaUseCaseImpl } from '../../application/usecases/ActivarCuentaUseCaseImpl';
-import { CrearGrupoUseCaseImpl } from '../../application/usecases/CrearGrupoUseCaseImpl';
-import { ListarGruposUsuarioUseCaseImpl } from '../../application/usecases/ListarGruposUsuarioUseCaseImpl';
-import { ObtenerDetalleGrupoUseCaseImpl } from '../../application/usecases/ObtenerDetalleGrupoUseCaseImpl';
-import { ArchivarGrupoUseCaseImpl } from '../../application/usecases/ArchivarGrupoUseCaseImpl';
-import { AgregarMiembroGrupoUseCaseImpl } from '../../application/usecases/AgregarMiembroGrupoUseCaseImpl';
-import { RegistrarGastoUseCaseImpl } from '../../application/usecases/RegistrarGastoUseCaseImpl';
-import { ListarGastosUseCaseImpl } from '../../application/usecases/ListarGastosUseCaseImpl';
-import { EliminarGastoUseCaseImpl } from '../../application/usecases/EliminarGastoUseCaseImpl';
-import { PagarParticipacionUseCaseImpl } from '../../application/usecases/PagarParticipacionUseCaseImpl';
-import { ObtenerResumenPanelUseCaseImpl } from '../../application/usecases/ObtenerResumenPanelUseCaseImpl';
-import { LiquidarBalanceUseCaseImpl } from '../../application/usecases/LiquidarBalanceUseCaseImpl';
-import { ListarHistorialUseCaseImpl } from '../../application/usecases/ListarHistorialUseCaseImpl';
-import { env } from './env';
+import { GrupoGastoService } from '../../application/services/GrupoGastoService';
+import { PostgresGrupoGastoRepository } from '../adapters/out/persistence/postgres/PostgresGrupoGastoRepository';
+import { GrupoGastoController } from '../adapters/in/http/controllers/GrupoGastoController';
+import { PostgresAdministracionRepository } from '../adapters/out/persistence/postgres/PostgresAdministracionRepository';
+import { AdministracionService } from '../../application/services/AdministracionService';
+import { AdministracionController } from '../adapters/in/http/controllers/AdministracionController';
+import { PostgresAuditoriaRepository } from '../adapters/out/persistence/postgres/PostgresAuditoriaRepository';
+import { AuditoriaService } from '../../application/services/AuditoriaService';
+import { AuditoriaController } from '../adapters/in/http/controllers/AuditoriaController';
+import { PostgresSoporteRepository } from '../adapters/out/persistence/postgres/PostgresSoporteRepository';
+import { SoporteService } from '../../application/services/SoporteService';
+import { AsistenteService } from '../../application/services/AsistenteService';
+import { OpenAIAsistente } from '../adapters/out/ia/OpenAIAsistente';
+import { construirPromptSoporte } from '../adapters/out/ia/promptSoporte';
+import { SoporteController } from '../adapters/in/http/controllers/SoporteController';
+import { AsistenteController } from '../adapters/in/http/controllers/AsistenteController';
 
-// --- Adaptadores de persistencia y seguridad ---
-export const usuarioRepository = new PostgresUsuarioRepository(pool);
-export const refreshTokenRepository = new PostgresRefreshTokenRepository(pool);
-export const grupoRepository = new PostgresGrupoRepository(pool);
-export const gastoRepository = new PostgresGastoRepository(pool);
-export const balanceRepository = new PostgresBalanceRepository(pool);
-export const movimientoRepository = new PostgresMovimientoRepository(pool);
+/**
+ * "Composition root" / contenedor de dependencias manual.
+ *
+ * Aqui, y SOLO aqui, se conectan los puertos con sus adaptadores
+ * concretos (Postgres, Argon2id, JWT). Este es el unico archivo que
+ * conecta los adaptadores concretos con los casos de uso.
+ * el dominio y la capa de aplicacion no se tocan.
+ */
 
-export const passwordHasher = new BcryptPasswordHasher();
-export const tokenService = new JwtTokenService(env.jwtSecret, env.jwtExpiracion);
+// --- Adaptadores de salida (infraestructura) ---
+const usuarioRepository = new PostgresUsuarioRepository(pool);
+const refreshTokenRepository = new PostgresRefreshTokenRepository(pool);
+const passwordHasher = new Argon2PasswordHasher();
+const tokenService = new JwtTokenService(env.jwtSecret, env.jwtExpiracion);
 
-// --- Casos de uso de Usuarios y Auth ---
+// --- Casos de uso (capa de aplicacion) ---
 export const registrarUsuarioUseCase = new RegistrarUsuarioUseCaseImpl(usuarioRepository, passwordHasher);
+
 export const iniciarSesionUseCase = new IniciarSesionUseCaseImpl(
   usuarioRepository,
   refreshTokenRepository,
   passwordHasher,
-  tokenService,
+  tokenService
 );
+
 export const refrescarTokenUseCase = new RefrescarTokenUseCaseImpl(
   usuarioRepository,
   refreshTokenRepository,
-  tokenService,
+  tokenService
 );
+
 export const cerrarSesionUseCase = new CerrarSesionUseCaseImpl(refreshTokenRepository);
+
 export const obtenerPerfilUseCase = new ObtenerPerfilUseCaseImpl(usuarioRepository);
 export const actualizarPerfilUseCase = new ActualizarPerfilUseCaseImpl(usuarioRepository);
 export const desactivarCuentaUseCase = new DesactivarCuentaUseCaseImpl(usuarioRepository, refreshTokenRepository);
 export const activarCuentaUseCase = new ActivarCuentaUseCaseImpl(usuarioRepository);
 
-// --- Casos de uso de Grupos ---
-export const crearGrupoUseCase = new CrearGrupoUseCaseImpl(grupoRepository, usuarioRepository, movimientoRepository);
-export const listarGruposUsuarioUseCase = new ListarGruposUsuarioUseCaseImpl(grupoRepository);
-export const obtenerDetalleGrupoUseCase = new ObtenerDetalleGrupoUseCaseImpl(grupoRepository);
-export const archivarGrupoUseCase = new ArchivarGrupoUseCaseImpl(grupoRepository);
-export const agregarMiembroGrupoUseCase = new AgregarMiembroGrupoUseCaseImpl(
-  grupoRepository,
-  usuarioRepository,
-  movimientoRepository,
-);
+const grupoGastoRepository = new PostgresGrupoGastoRepository(pool);
+const grupoGastoService = new GrupoGastoService(grupoGastoRepository);
+export const grupoGastoController = new GrupoGastoController(grupoGastoService);
 
-// --- Casos de uso de Gastos ---
-export const registrarGastoUseCase = new RegistrarGastoUseCaseImpl(
-  gastoRepository,
-  grupoRepository,
-  balanceRepository,
-  movimientoRepository,
-);
-export const listarGastosUseCase = new ListarGastosUseCaseImpl(gastoRepository);
-export const eliminarGastoUseCase = new EliminarGastoUseCaseImpl(
-  gastoRepository,
-  grupoRepository,
-  balanceRepository,
-  movimientoRepository,
-);
-export const pagarParticipacionUseCase = new PagarParticipacionUseCaseImpl(
-  gastoRepository,
-  grupoRepository,
-  balanceRepository,
-  movimientoRepository,
-);
+const administracionRepository = new PostgresAdministracionRepository(pool, poolHistorico);
+const administracionService = new AdministracionService(administracionRepository);
+export const administracionController = new AdministracionController(administracionService);
 
-// --- Casos de uso de Panel, Balances e Historial ---
-export const obtenerResumenPanelUseCase = new ObtenerResumenPanelUseCaseImpl(grupoRepository, balanceRepository);
-export const liquidarBalanceUseCase = new LiquidarBalanceUseCaseImpl(
-  balanceRepository,
-  grupoRepository,
-  movimientoRepository,
-);
-export const listarHistorialUseCase = new ListarHistorialUseCaseImpl(movimientoRepository);
+const auditoriaRepository = new PostgresAuditoriaRepository(pool);
+export const auditoriaService = new AuditoriaService(auditoriaRepository);
+export const auditoriaController = new AuditoriaController(auditoriaService);
 
+// --- Modulo de soporte y asistente conversacional ---
+// El adaptador del modelo se construye siempre; si falta IA_API_KEY queda
+// marcado como no disponible y el endpoint responde 503 sin romper nada.
+const soporteRepository = new PostgresSoporteRepository(pool);
+const soporteService = new SoporteService(soporteRepository);
+export const soporteController = new SoporteController(soporteService);
+
+const asistenteIA = new OpenAIAsistente({
+  apiKey: env.iaApiKey,
+  baseUrl: env.iaBaseUrl,
+  modelo: env.iaModelo,
+  temperatura: env.iaTemperatura,
+  maxTokens: env.iaMaxTokens,
+  timeoutMs: env.iaTimeoutMs,
+});
+
+export const asistenteService = new AsistenteService(
+  asistenteIA,
+  soporteService,
+  soporteRepository,
+  construirPromptSoporte,
+);
+export const asistenteController = new AsistenteController(asistenteService, usuarioRepository);
+
+// Exportado para que el middleware de autenticacion pueda verificar
+// access tokens sin duplicar la logica de JWT.
 export const tokenServiceInstancia = tokenService;
+export const usuarioRepositoryInstancia = usuarioRepository;
+export const refreshTokenRepositoryInstancia = refreshTokenRepository;

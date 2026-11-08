@@ -19,6 +19,7 @@ export interface RegistrarUsuarioResultado {
   email: string;
   telefono: string | null;
   estado: string;
+  rol: RolUsuario;
   fechaRegistro: Date;
 }
 
@@ -70,3 +71,4 @@ export interface DesactivarCuentaUseCase {
 export interface ActivarCuentaUseCase {
   ejecutar(usuarioId: number): Promise<RegistrarUsuarioResultado>;
 }
+import { RolUsuario } from '../../entities/Usuario';

@@ -1,15 +1,33 @@
 import { Router } from 'express';
-import { GrupoController } from '../controllers/GrupoController';
+import { grupoGastoController } from '../../../../config/container';
 import { autenticar } from '../middlewares/authMiddleware';
-import { validarBody } from '../middlewares/validate';
-import { crearGrupoSchema, agregarMiembroSchema } from '../validators/grupoValidators';
+import { validarBody, validarParams } from '../middlewares/validate';
+import {
+  aportarAlcanciaSchema,
+  configurarAlcanciaSchema,
+  crearGastoSchema,
+  crearGrupoSchema,
+  gastoParamsSchema,
+  grupoIdParamsSchema,
+  miembroParamsSchema,
+  miembroSchema,
+} from '../validators/grupoValidators';
 
-export const grupoRouter = Router();
+const router = Router();
 
-grupoRouter.use(autenticar);
+router.use(autenticar);
+router.get('/', grupoGastoController.listarGrupos);
+router.post('/', validarBody(crearGrupoSchema), grupoGastoController.crearGrupo);
+router.get('/:grupoId/integrantes', validarParams(grupoIdParamsSchema), grupoGastoController.listarIntegrantes);
+router.post('/:grupoId/integrantes', validarParams(grupoIdParamsSchema), validarBody(miembroSchema), grupoGastoController.agregarMiembro);
+router.delete('/:grupoId/integrantes/:usuarioId', validarParams(miembroParamsSchema), grupoGastoController.quitarMiembro);
+router.get('/:grupoId/gastos', validarParams(grupoIdParamsSchema), grupoGastoController.listarGastos);
+router.post('/:grupoId/gastos', validarParams(grupoIdParamsSchema), validarBody(crearGastoSchema), grupoGastoController.crearGasto);
+router.get('/:grupoId/balances', validarParams(grupoIdParamsSchema), grupoGastoController.listarBalances);
+router.get('/:grupoId/historial', validarParams(grupoIdParamsSchema), grupoGastoController.listarHistorial);
+router.get('/:grupoId/alcancia', validarParams(grupoIdParamsSchema), grupoGastoController.obtenerAlcancia);
+router.put('/:grupoId/alcancia', validarParams(grupoIdParamsSchema), validarBody(configurarAlcanciaSchema), grupoGastoController.configurarAlcancia);
+router.post('/:grupoId/alcancia/aportes', validarParams(grupoIdParamsSchema), validarBody(aportarAlcanciaSchema), grupoGastoController.aportarAlcancia);
+router.post('/gastos/:gastoId/pagos', validarParams(gastoParamsSchema), grupoGastoController.registrarPago);
 
-grupoRouter.get('/', GrupoController.listar);
-grupoRouter.get('/:id', GrupoController.obtenerPorId);
-grupoRouter.post('/', validarBody(crearGrupoSchema), GrupoController.crear);
-grupoRouter.delete('/:id', GrupoController.archivar);
-grupoRouter.post('/:id/miembros', validarBody(agregarMiembroSchema), GrupoController.agregarMiembro);
+export default router;

@@ -9,6 +9,7 @@ import { PasswordHasher } from '../../domain/ports/out/PasswordHasher';
 import { UsuarioRepository } from '../../domain/ports/out/UsuarioRepository';
 
 const PASSWORD_MIN_LENGTH = 8;
+const PASSWORD_MAX_LENGTH = 72;
 
 /**
  * Caso de uso "Registrar usuario" (capa de aplicacion).
@@ -52,6 +53,11 @@ export class RegistrarUsuarioUseCaseImpl implements RegistrarUsuarioUseCase {
         `La contrasena debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres.`
       );
     }
+    if (password.length > PASSWORD_MAX_LENGTH) {
+      throw new ValidacionError(
+        `La contrasena no puede superar los ${PASSWORD_MAX_LENGTH} caracteres.`
+      );
+    }
   }
 
   private aResultado(usuario: Usuario): RegistrarUsuarioResultado {
@@ -61,6 +67,7 @@ export class RegistrarUsuarioUseCaseImpl implements RegistrarUsuarioUseCase {
       email: usuario.email,
       telefono: usuario.telefono,
       estado: usuario.estado,
+      rol: usuario.rol,
       fechaRegistro: usuario.fechaRegistro,
     };
   }

@@ -10,6 +10,7 @@ describe('IniciarSesionUseCaseImpl', () => {
   function crearMocks() {
     const usuarioRepository: jest.Mocked<UsuarioRepository> = {
       guardar: jest.fn(),
+      actualizarPasswordHash: jest.fn(),
       buscarPorEmail: jest.fn(),
       buscarPorId: jest.fn(),
       existeEmail: jest.fn(),
@@ -23,6 +24,7 @@ describe('IniciarSesionUseCaseImpl', () => {
     const passwordHasher: jest.Mocked<PasswordHasher> = {
       hash: jest.fn(),
       comparar: jest.fn(),
+      necesitaRehash: jest.fn().mockReturnValue(false),
     };
     const tokenService: jest.Mocked<TokenService> = {
       generarAccessToken: jest.fn(),
@@ -66,6 +68,41 @@ describe('IniciarSesionUseCaseImpl', () => {
     expect(resultado.accessToken).toBe('access-token-simulado');
     expect(resultado.refreshToken).toBe('refresh-token-simulado');
     expect(resultado.usuario.email).toBe('ana@example.com');
+    expect(resultado.usuario.rol).toBe('usuario');
+    expect(tokenService.generarAccessToken).toHaveBeenCalledWith({
+      usuarioId: 1,
+      email: 'ana@example.com',
+      rol: 'usuario',
+    });
+  });
+
+  it('actualiza un hash legado despues de autenticar correctamente', async () => {
+    const { usuarioRepository, refreshTokenRepository, passwordHasher, tokenService } = crearMocks();
+    usuarioRepository.buscarPorEmail.mockResolvedValue(usuarioActivo);
+    passwordHasher.comparar.mockResolvedValue(true);
+    passwordHasher.necesitaRehash.mockReturnValue(true);
+    passwordHasher.hash.mockResolvedValue('$argon2id$hash-nuevo');
+    tokenService.generarAccessToken.mockReturnValue('access-token-simulado');
+    tokenService.generarRefreshTokenString.mockReturnValue('refresh-token-simulado');
+    refreshTokenRepository.guardar.mockResolvedValue({
+      usuarioId: 1,
+      token: 'refresh-token-simulado',
+      fechaCreacion: new Date(),
+      fechaExpiracion: new Date(),
+      revocado: false,
+    });
+
+    const useCase = new IniciarSesionUseCaseImpl(
+      usuarioRepository,
+      refreshTokenRepository,
+      passwordHasher,
+      tokenService
+    );
+
+    await useCase.ejecutar({ email: 'ana@example.com', password: 'clave123' });
+
+    expect(passwordHasher.hash).toHaveBeenCalledWith('clave123');
+    expect(usuarioRepository.actualizarPasswordHash).toHaveBeenCalledWith(1, '$argon2id$hash-nuevo');
   });
 
   it('rechaza con CredencialesInvalidasError si el usuario no existe', async () => {

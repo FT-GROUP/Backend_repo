@@ -2,19 +2,11 @@ CREATE TABLE IF NOT EXISTS grupo (
     id BIGSERIAL PRIMARY KEY,
     nombre VARCHAR(120) NOT NULL,
     descripcion TEXT,
-    icono VARCHAR(30) DEFAULT 'building',
-    ciudad VARCHAR(80),
-    lat NUMERIC(9, 6),
-    lng NUMERIC(9, 6),
     creado_por BIGINT NOT NULL REFERENCES usuario(id),
     fecha_creacion TIMESTAMP NOT NULL DEFAULT NOW(),
     estado VARCHAR(20) NOT NULL DEFAULT 'activo'
         CHECK (estado IN ('activo', 'archivado'))
 );
-ALTER TABLE grupo ADD COLUMN IF NOT EXISTS icono VARCHAR(30) DEFAULT 'building';
-ALTER TABLE grupo ADD COLUMN IF NOT EXISTS ciudad VARCHAR(80);
-ALTER TABLE grupo ADD COLUMN IF NOT EXISTS lat NUMERIC(9, 6);
-ALTER TABLE grupo ADD COLUMN IF NOT EXISTS lng NUMERIC(9, 6);
 
 CREATE TABLE IF NOT EXISTS miembro_grupo (
     id BIGSERIAL PRIMARY KEY,
