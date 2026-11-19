@@ -1,4 +1,5 @@
 const MOTIVOS_AUTENTICACION: Record<string, string> = {
+  '/graphql': 'Ejecutar una consulta o mutación GraphQL autorizada.',
   '/api/auth/registro': 'Crear una cuenta para habilitar el acceso al sistema.',
   '/api/auth/login': 'Verificar la identidad y crear una sesión.',
   '/api/auth/refresh': 'Renovar una sesión autenticada.',
@@ -19,7 +20,31 @@ const RECURSOS: Record<string, string> = {
   asistente: 'el asistente de soporte con IA',
 }
 
-export function motivoSolicitudAuditoria(metodo: string, ruta: string): string {
+// El "por que" de cada operacion de GraphQL. Una entrada que solo diga
+// "POST /graphql" no cumple la regla 5W: no explica que se hizo.
+const MOTIVOS_GRAPHQL: Record<string, string> = {
+  usuarios: 'Consultar el listado de cuentas activas o historicas.',
+  misGrupos: 'Consultar los grupos propios del usuario.',
+  gruposArchivados: 'Consultar los grupos archivados.',
+  yo: 'Consultar el consolidado financiero propio.',
+  archivarGrupo: 'Archivar un grupo y moverlo a la base historica.',
+  desactivarUsuario: 'Desactivar una cuenta y moverla a la base historica.',
+}
+
+export function motivoSolicitudAuditoria(
+  metodo: string,
+  ruta: string,
+  operacionGraphql?: string | null,
+): string {
+  if (ruta === '/graphql') {
+    if (operacionGraphql && MOTIVOS_GRAPHQL[operacionGraphql]) {
+      return MOTIVOS_GRAPHQL[operacionGraphql]!
+    }
+    return operacionGraphql
+      ? `Ejecutar la operacion "${operacionGraphql}" sobre la API GraphQL.`
+      : 'Ejecutar una consulta o mutación GraphQL autorizada.'
+  }
+
   const motivoEspecifico = MOTIVOS_AUTENTICACION[ruta]
   if (motivoEspecifico) return motivoEspecifico
 
